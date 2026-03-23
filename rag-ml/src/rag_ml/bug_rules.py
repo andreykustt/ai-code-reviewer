@@ -28,6 +28,12 @@ def _matching_rule_ref(task: HunkTask, signals: list[StaticSignal], preferred_ty
     return refs[:2]
 
 
+def _line_code_ref(task: HunkTask, index: int) -> str:
+    if 0 <= index < len(task.changedNewLines):
+        return code_ref(task.taskId, index + 1)
+    return code_ref(task.taskId, 0)
+
+
 def rule_based_bug_candidates(task: HunkTask, signals: list[StaticSignal]) -> list[CandidateFinding]:
     if task.languageSlug != "python":
         return []
@@ -48,7 +54,7 @@ def rule_based_bug_candidates(task: HunkTask, signals: list[StaticSignal]) -> li
                     title="Avoid mutable default arguments",
                     body="This function introduces a mutable default argument, which can retain state across calls and cause unexpected behavior.",
                     confidence=0.92,
-                    evidenceRefs=[code_ref(task.taskId, 0), *_matching_rule_ref(task, signals)],
+                    evidenceRefs=[_line_code_ref(task, index), *_matching_rule_ref(task, signals)],
                 )
             )
 
@@ -63,7 +69,7 @@ def rule_based_bug_candidates(task: HunkTask, signals: list[StaticSignal]) -> li
                     title="Avoid broad exception handling",
                     body="Catching Exception directly can hide programming errors and make failures harder to diagnose.",
                     confidence=0.84,
-                    evidenceRefs=[code_ref(task.taskId, 0), *_matching_rule_ref(task, signals)],
+                    evidenceRefs=[_line_code_ref(task, index), *_matching_rule_ref(task, signals)],
                 )
             )
 
@@ -78,7 +84,7 @@ def rule_based_bug_candidates(task: HunkTask, signals: list[StaticSignal]) -> li
                     title="Avoid building SQL queries from interpolated strings",
                     body="This query appears to interpolate runtime values directly into SQL text, which can create injection risk and brittle query behavior.",
                     confidence=0.95,
-                    evidenceRefs=[code_ref(task.taskId, 0), *_matching_rule_ref(task, signals)],
+                    evidenceRefs=[_line_code_ref(task, index), *_matching_rule_ref(task, signals)],
                 )
             )
 
@@ -93,7 +99,7 @@ def rule_based_bug_candidates(task: HunkTask, signals: list[StaticSignal]) -> li
                     title="Do not log sensitive authentication data",
                     body="This logging statement appears to include sensitive token or credential data, which should not be written to logs.",
                     confidence=0.9,
-                    evidenceRefs=[code_ref(task.taskId, 0), *_matching_rule_ref(task, signals)],
+                    evidenceRefs=[_line_code_ref(task, index), *_matching_rule_ref(task, signals)],
                 )
             )
 
@@ -108,7 +114,7 @@ def rule_based_bug_candidates(task: HunkTask, signals: list[StaticSignal]) -> li
                     title="Check whether async work should be awaited",
                     body="This change returns or forwards a call that looks asynchronous without awaiting it. Verify that the surrounding function is intentionally returning the awaitable instead of its resolved result.",
                     confidence=0.74,
-                    evidenceRefs=[code_ref(task.taskId, 0), *_matching_rule_ref(task, signals, preferred_type="async-risk")],
+                    evidenceRefs=[_line_code_ref(task, index), *_matching_rule_ref(task, signals, preferred_type="async-risk")],
                 )
             )
 
@@ -130,7 +136,7 @@ def rule_based_bug_candidates(task: HunkTask, signals: list[StaticSignal]) -> li
                     title="Remove unreachable code after terminal statement",
                     body="This block adds executable code after a return or raise statement, so the later line will never run.",
                     confidence=0.9,
-                    evidenceRefs=[code_ref(task.taskId, 0), *_matching_rule_ref(task, signals, preferred_type="unreachable-after-terminal")],
+                    evidenceRefs=[_line_code_ref(task, index + 1), *_matching_rule_ref(task, signals, preferred_type="unreachable-after-terminal")],
                 )
             )
 

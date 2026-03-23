@@ -13,7 +13,7 @@ if str(RAG_SRC) not in sys.path:
 from rag_ml.citation_resolver import CitationResolver
 from rag_ml.context_builder import build_context_pack
 from rag_ml.bug_rules import rule_based_bug_candidates
-from rag_ml.evidence_models import doc_ref
+from rag_ml.evidence_models import code_ref, doc_ref
 from rag_ml.file_classifier import classify_file
 from rag_ml.hotspot_planner import plan_hotspot_tasks
 from rag_ml.kb_chunker import chunk_documents
@@ -446,6 +446,49 @@ class RagRuntimeTests(unittest.IsolatedAsyncioTestCase):
         ]
         candidates = rule_based_bug_candidates(task, signals)
         self.assertTrue(any(candidate.title == "Remove unreachable code after terminal statement" for candidate in candidates))
+
+    def test_bug_rules_point_unreachable_code_evidence_at_offending_line(self) -> None:
+        task = HunkTask(
+            taskId="src/example.py:0",
+            filePath="src/example.py",
+            language="Python",
+            languageSlug="python",
+            patch="@@ -8,0 +10,3 @@\n+value = load()\n+raise ValueError('boom')\n+persist(value)",
+            hunkIndex=0,
+            hunkHeader="@@ -8,0 +10,3 @@",
+            hunkPatch="@@ -8,0 +10,3 @@\n+value = load()\n+raise ValueError('boom')\n+persist(value)",
+            addedLines=["value = load()", "raise ValueError('boom')", "persist(value)"],
+            changedNewLines=[10, 11, 12],
+            firstChangedLine=10,
+            priority=1.0,
+        )
+
+        candidates = rule_based_bug_candidates(task, [])
+        unreachable = next(candidate for candidate in candidates if candidate.title == "Remove unreachable code after terminal statement")
+        self.assertEqual(unreachable.lineStart, 12)
+        self.assertEqual(unreachable.evidenceRefs[0], code_ref(task.taskId, 3))
+
+    def test_context_pack_builds_line_focused_code_candidates(self) -> None:
+        task = HunkTask(
+            taskId="src/example.py:0",
+            filePath="src/example.py",
+            language="Python",
+            languageSlug="python",
+            patch="@@ -8,0 +10,3 @@\n+value = load()\n+raise ValueError('boom')\n+persist(value)",
+            hunkIndex=0,
+            hunkHeader="@@ -8,0 +10,3 @@",
+            hunkPatch="@@ -8,0 +10,3 @@\n+value = load()\n+raise ValueError('boom')\n+persist(value)",
+            addedLines=["value = load()", "raise ValueError('boom')", "persist(value)"],
+            changedNewLines=[10, 11, 12],
+            firstChangedLine=10,
+            priority=1.0,
+        )
+
+        context = build_context_pack(task, [], [])
+        code_candidate = next(candidate for candidate in context.codeEvidenceCandidates if candidate.refId == code_ref(task.taskId, 3))
+        self.assertEqual(code_candidate.lineStart, 12)
+        self.assertIn("raise ValueError('boom')", code_candidate.snippet)
+        self.assertIn("persist(value)", code_candidate.snippet)
 
     def test_verifier_rejects_valid_private_dart_type_name(self) -> None:
         candidate = CandidateFinding(

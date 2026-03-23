@@ -122,6 +122,26 @@ def build_context_pack(task: HunkTask, signals: list[StaticSignal], doc_hits: li
     )
     next_index += 1
 
+    for added_index, line_no in enumerate(task.changedNewLines):
+        line_window = _build_context_window(task.hunkPatch, line_start=line_no, line_end=line_no, before=2, after=2)
+        code_candidates.append(
+            ContextEvidenceCandidate(
+                refId=code_ref(task.taskId, next_index),
+                type="code",
+                title=f"Измененная строка {task.filePath}:{line_no}",
+                snippet=_truncate(_window_snippet(line_window) or task.addedLines[added_index], 240),
+                filePath=task.filePath,
+                lineStart=line_no,
+                lineEnd=line_no,
+                metadata={
+                    "taskId": task.taskId,
+                    "addedLineIndex": added_index,
+                    "contextWindow": line_window,
+                },
+            )
+        )
+        next_index += 1
+
     for block in task.changedBlocks[:4]:
         context_window = _build_context_window(task.hunkPatch, line_start=block.lineStart, line_end=block.lineEnd)
         code_candidates.append(
